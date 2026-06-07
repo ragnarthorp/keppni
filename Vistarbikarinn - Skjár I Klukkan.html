@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vistarbikarinn — Skjár I: Klukkan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #070d0b;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  /* the game screen — full height, phone-width on larger viewports */
+  .stage {
+    position: relative;
+    width: 100%; max-width: 440px;
+    height: 100vh; max-height: 940px;
+    overflow: hidden;
+  }
+
+  /* ── phone screen ── */
+  .cs-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: "Cormorant Garamond", Georgia, serif;
+    color: #f4ecd6;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .cs-grain {
+    position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+  .cs-vig {
+    position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 120px 30px rgba(0,0,0,.55);
+  }
+
+  /* ── header ── */
+  .cs-head {
+    position: relative; z-index: 2;
+    margin-top: 58px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .cs-rule { display: block; width: 34px; height: 1px; background: currentColor; opacity: .4; }
+  .cs-head .cs-rule { color: #caa24f; }
+  .cs-chapter {
+    font-family: "Cinzel", serif; font-size: 12px; font-weight: 600;
+    letter-spacing: 4px; text-transform: uppercase;
+  }
+
+  /* ── clock stage ── */
+  .cs-stage {
+    position: relative; z-index: 2;
+    flex: 1 1 auto;
+    display: flex; align-items: center; justify-content: center;
+    width: 100%;
+  }
+  .cs-clock {
+    width: 246px; height: 290px;
+    display: flex; align-items: center; justify-content: center;
+    filter: drop-shadow(0 18px 26px rgba(0,0,0,.5));
+  }
+
+  /* ── prompt ── */
+  .cs-prompt {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 0 30px 46px;
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .cs-prompt.is-hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  .cs-prompt-line {
+    margin: 0 0 14px;
+    font-size: 20px; line-height: 1.32; font-style: italic;
+    color: #ede1c4; letter-spacing: .2px;
+  }
+  .cs-prompt-hint {
+    margin: 0; font-family: "Cinzel", serif; font-size: 10.5px;
+    letter-spacing: 3px; text-transform: uppercase; opacity: .82;
+  }
+
+  /* ── success overlay ── */
+  .cs-win {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(80% 60% at 50% 46%, rgba(8,5,2,.62), rgba(8,5,2,.9));
+    opacity: 0; pointer-events: none;
+    transition: opacity .7s ease;
+  }
+  .cs-win.is-on { opacity: 1; pointer-events: auto; }
+  .cs-win-inner { text-align: center; transform: translateY(10px); transition: transform .7s cubic-bezier(.2,.8,.3,1); }
+  .cs-win.is-on .cs-win-inner { transform: translateY(0); }
+  .cs-win-time {
+    font-family: "Cinzel", serif; font-size: 62px; font-weight: 500;
+    line-height: 1; letter-spacing: 2px;
+    text-shadow: 0 2px 30px rgba(202,162,79,.45);
+  }
+  .cs-win-rule { width: 64px; height: 1px; margin: 20px auto; opacity: .6; }
+  .cs-win-cap {
+    font-family: "Cinzel", serif; font-size: 10px; font-weight: 500;
+    letter-spacing: 3px; color: #d8c9a8; opacity: .85;
+  }
+  .cs-win-go {
+    margin-top: 34px;
+    background: transparent;
+    border: 1px solid;
+    border-radius: 2px;
+    padding: 12px 30px;
+    font-family: "Cinzel", serif; font-size: 12px; font-weight: 600;
+    letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+  }
+  .cs-win-go:hover { background: rgba(202,162,79,.12); }
+  .cs-win-go:active { transform: scale(.97); }
+
+  /* ── faint per-screen contact ── */
+  .cs-contact {
+    position: absolute; bottom: 12px; left: 0; right: 0; z-index: 2;
+    text-align: center;
+    font-family: "EB Garamond", serif; font-size: 9px; letter-spacing: 1px;
+    color: rgba(244,236,214,.11);
+  }
+
+  /* ── screen II: combination lock + @ sigil ── */
+  .lk-stage {
+    position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 38px; padding: 0 24px;
+  }
+  .lk-at {
+    width: 96px; height: 96px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 38% 32%, #1c302b, #0b1614 80%);
+    box-shadow: 0 0 0 2px #0b1614, 0 0 0 4px rgba(202,162,79,.85),
+                inset 0 2px 10px rgba(0,0,0,.6), 0 10px 30px rgba(0,0,0,.5);
+  }
+  .lk-at-char {
+    font-family: "Cormorant Garamond", serif; font-size: 64px; font-weight: 500; line-height: 1;
+    text-shadow: 0 2px 14px rgba(202,162,79,.35);
+  }
+  .lk-plate {
+    display: flex; gap: 10px; padding: 16px;
+    border-radius: 14px;
+    background: linear-gradient(180deg,#f0dca2 0%,#caa24f 34%,#8a6526 56%,#caa24f 86%,#7a5a2a 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 14px 34px rgba(0,0,0,.55), 0 0 0 1px #5a3f1c;
+  }
+  .lk-wheel { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .lk-chev {
+    width: 30px; height: 18px; border: none; background: transparent; cursor: pointer; padding: 0;
+    color: #4a3415; opacity: .65; display: flex; align-items: center; justify-content: center; transition: opacity .15s;
+  }
+  .lk-chev:hover:not(:disabled) { opacity: 1; }
+  .lk-chev:disabled { opacity: .22; cursor: default; }
+  .lk-reel {
+    position: relative; width: 48px; height: 116px; overflow: hidden; border-radius: 5px;
+    background: linear-gradient(180deg,#0a1311,#13211d 50%,#0a1311);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.8), inset 0 0 0 1px rgba(0,0,0,.6);
+  }
+  .lk-reel::before, .lk-reel::after { content: ""; position: absolute; left: 0; right: 0; height: 44px; pointer-events: none; z-index: 2; }
+  .lk-reel::before { top: 0; background: linear-gradient(180deg,#0a1311 8%,rgba(10,19,17,0)); }
+  .lk-reel::after { bottom: 0; background: linear-gradient(0deg,#0a1311 8%,rgba(10,19,17,0)); }
+  .lk-letter {
+    position: absolute; left: 50%; top: 50%;
+    font-family: "Cinzel", serif; font-size: 30px; font-weight: 600; letter-spacing: 1px;
+    will-change: transform;
+  }
+  .lk-glow { position: absolute; inset: 0; border-radius: 5px; pointer-events: none; z-index: 3; transition: box-shadow .45s; }
+  .lk-go { margin-top: 0; opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .6s ease, transform .6s ease, background .2s; }
+  .lk-go.is-on { opacity: 1; transform: translateY(0); pointer-events: auto;
+    background: rgba(202,162,79,.09); box-shadow: 0 0 22px rgba(202,162,79,.18);
+    text-shadow: 0 1px 10px rgba(202,162,79,.4); }
+  .lk-go.is-on { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+  /* ── chapter scaffold ── */
+  .cs-soon {
+    position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Cinzel", serif; font-size: 11px; letter-spacing: 3px;
+    text-transform: uppercase; color: rgba(202,162,79,.55);
+  }
+
+  /* ── screen III: anagram rack ── */
+  .an-stage {
+    position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 40px; padding: 0 20px;
+  }
+  .an-rack { position: relative; }
+  .an-tile {
+    position: absolute; top: 0; left: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Cinzel", serif; font-size: 23px; font-weight: 600; letter-spacing: .5px;
+    color: var(--ink, #23324d);
+    background: linear-gradient(165deg,#f6efda 0%,#ece0c0 55%,#ddccaa 100%);
+    border-radius: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 -2px 3px rgba(120,90,40,.25),
+                0 3px 6px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .an-tile.is-drag {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 14px 26px rgba(0,0,0,.5), 0 4px 8px rgba(0,0,0,.4);
+    cursor: grabbing;
+  }
+  .an-tile.is-set {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 0 14px rgba(202,162,79,.4), 0 3px 6px rgba(0,0,0,.4);
+  }
+  .an-shuffle {
+    display: inline-flex; align-items: center; gap: 9px;
+    background: transparent; border: 1px solid; border-radius: 2px; padding: 10px 22px;
+    font-family: "Cinzel", serif; font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; transition: background .2s, opacity .2s, transform .15s;
+  }
+  .an-shuffle:hover:not(:disabled) { background: rgba(202,162,79,.1); }
+  .an-shuffle:active:not(:disabled) { transform: scale(.97); }
+  .an-shuffle:disabled { opacity: .3; cursor: default; }
+  .an-go { margin-top: 0; opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .6s ease, transform .6s ease, background .2s; }
+  .an-go.is-on { opacity: 1; transform: translateY(0); pointer-events: auto;
+    background: rgba(202,162,79,.09); box-shadow: 0 0 22px rgba(202,162,79,.18);
+    text-shadow: 0 1px 10px rgba(202,162,79,.4); }
+
+  /* ── screen IV: video + ? + passcode ── */
+  .iv-stage {
+    position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 26px; padding: 18px 24px; overflow-y: auto;
+  }
+  .iv-reopen {
+    display: inline-flex; align-items: center; gap: 8px; background: transparent;
+    border: 1px solid; border-radius: 2px; padding: 8px 16px;
+    font-family: "Cinzel", serif; font-size: 10px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase;
+    cursor: pointer; opacity: .8; transition: background .2s, opacity .2s; flex: 0 0 auto;
+  }
+  .iv-reopen:hover { background: rgba(202,162,79,.1); opacity: 1; }
+  .iv-q { cursor: pointer; transition: transform .2s, box-shadow .3s, opacity .3s; flex: 0 0 auto; }
+  .iv-q:hover { transform: translateY(-2px); }
+  .iv-q .lk-at-char { font-family: "Cinzel", serif; font-size: 54px; font-weight: 600; }
+  .iv-q.is-open { opacity: .5; transform: scale(.84); }
+  .iv-brief {
+    max-width: 330px; text-align: center; opacity: 0; max-height: 0; overflow: hidden;
+    transform: translateY(6px); transition: opacity .5s ease, transform .5s ease, max-height .55s ease;
+  }
+  .iv-brief.is-on { opacity: 1; max-height: 460px; transform: translateY(0); }
+  .iv-brief p { margin: 0 0 12px; font-size: 17px; line-height: 1.45; color: #ece1c6; }
+  .iv-brief em { font-style: italic; }
+  .iv-cells { display: flex; gap: 9px; justify-content: center; margin-top: 20px; }
+  .iv-cell {
+    width: 42px; height: 52px; text-align: center;
+    background: linear-gradient(180deg,#0a1311,#13211d 50%,#0a1311);
+    border: 1px solid; border-radius: 5px; outline: none;
+    font-family: "Cinzel", serif; font-size: 24px; font-weight: 600; text-transform: uppercase; caret-color: #caa24f;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.7); transition: border-color .2s, box-shadow .2s;
+  }
+  .iv-cell:focus { box-shadow: inset 0 2px 5px rgba(0,0,0,.7), 0 0 0 1.5px rgba(202,162,79,.6); }
+  .iv-cell.is-set { box-shadow: inset 0 2px 5px rgba(0,0,0,.7), 0 0 12px rgba(202,162,79,.4); }
+  .iv-go { margin-top: 8px; opacity: 0; transform: translateY(10px); pointer-events: none;
+    transition: opacity .6s ease, transform .6s ease, background .2s; }
+  .iv-go.is-on { opacity: 1; transform: translateY(0); pointer-events: auto;
+    background: rgba(202,162,79,.09); box-shadow: 0 0 22px rgba(202,162,79,.18); text-shadow: 0 1px 10px rgba(202,162,79,.4); }
+
+  /* video modal (drops down) */
+  .iv-modal {
+    position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 84px; background: rgba(5,12,10,.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity .35s ease;
+  }
+  .iv-modal.is-on { opacity: 1; pointer-events: auto; }
+  .iv-dialog {
+    width: min(360px, 86%); background: linear-gradient(180deg,#16261f,#0d1815);
+    border: 1px solid rgba(202,162,79,.4); border-radius: 10px; overflow: hidden;
+    box-shadow: 0 26px 60px rgba(0,0,0,.6); transform: translateY(-24px); transition: transform .4s cubic-bezier(.2,.8,.3,1);
+  }
+  .iv-modal.is-on .iv-dialog { transform: translateY(0); }
+  .iv-dialog-bar { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px;
+    border-bottom: 1px solid rgba(202,162,79,.18); }
+  .iv-dialog-title { font-family: "Cinzel", serif; font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; }
+  .iv-close { background: transparent; border: none; color: rgba(244,236,214,.6); font-size: 22px; line-height: 1;
+    cursor: pointer; padding: 0 4px; transition: color .15s; }
+  .iv-close:hover { color: #f4ecd6; }
+  .iv-player { padding: 14px; }
+  .iv-frame { position: relative; aspect-ratio: 16/9; border-radius: 6px; overflow: hidden;
+    background: #000; box-shadow: inset 0 0 0 1px rgba(202,162,79,.15); }
+  .iv-yt { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .iv-thumb { position: absolute; inset: 0; width: 100%; height: 100%; border: none; padding: 0; cursor: pointer;
+    background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
+  .iv-thumb::after { content: ""; position: absolute; inset: 0; background: rgba(6,12,10,.32); transition: background .2s; }
+  .iv-thumb:hover::after { background: rgba(6,12,10,.12); }
+  .iv-yt-link { display: inline-block; margin-top: 11px; font-family: "Cinzel", serif; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase; text-decoration: none; opacity: .72; transition: opacity .15s; }
+  .iv-yt-link:hover { opacity: 1; text-decoration: underline; }
+  .iv-poster { position: relative; aspect-ratio: 16/9; border-radius: 6px; overflow: hidden;
+    background: radial-gradient(120% 120% at 50% 30%, #1a2b25, #070f0d);
+    display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(202,162,79,.15); }
+  .iv-clap { position: absolute; opacity: .5; }
+  .iv-play { position: relative; z-index: 2; width: 58px; height: 58px; border-radius: 50%;
+    border: 1.5px solid rgba(202,162,79,.7); background: rgba(8,14,12,.55); color: #caa24f;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding-left: 3px;
+    transition: transform .15s, background .2s, box-shadow .2s; box-shadow: 0 0 22px rgba(202,162,79,.2); }
+  .iv-play.is-playing { padding-left: 0; }
+  .iv-play:hover { transform: scale(1.06); background: rgba(202,162,79,.14); }
+  .iv-bar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .iv-time { font-family: "EB Garamond", serif; font-size: 11px; color: rgba(244,236,214,.55); font-variant-numeric: tabular-nums; }
+  .iv-track { flex: 1; height: 3px; border-radius: 2px; background: rgba(202,162,79,.18); overflow: hidden; }
+  .iv-fill { height: 100%; background: #caa24f; border-radius: 2px; }
+
+  /* ── screen V: stereogram ── */
+  .sv-stage {
+    position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 26px; padding: 18px 22px; overflow-y: auto;
+  }
+  .sv-img { width: 100%; border-radius: 8px; overflow: hidden;
+    border: 1px solid rgba(202,162,79,.35); box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+  .sv-img img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+  .sv-pass { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .sv-label { font-family: "Cinzel", serif; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; opacity: .75; }
+
+  /* ── screen VI: scoreboard ── */
+  .sb-stage { position: relative; z-index: 2; flex: 1 1 auto; width: 100%;
+    overflow-y: auto; padding: 8px 20px 30px; display: flex; flex-direction: column; gap: 18px; }
+  .sb-stage > * { flex-shrink: 0; }
+  .sb-titles { text-align: center; margin-top: 6px; }
+  .sb-title { font-family: "Cinzel", serif; font-size: 30px; font-weight: 600; letter-spacing: 1px; margin: 0; color: #f4ecd6; }
+  .sb-sub { font-family: "Cormorant Garamond", serif; font-style: italic; font-size: 16px; color: #caa24f; margin: 4px 0 0; letter-spacing: .3px; }
+  .sb-kicker { font-family: "Cinzel", serif; font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: #caa24f; opacity: .8; }
+  .sb-kicker-dark { color: #5a3f1c; opacity: .9; }
+  .sb-hero { position: relative; overflow: hidden; border-radius: 12px; padding: 20px 22px;
+    background: linear-gradient(135deg,#f0dca2,#caa24f 60%,#a87f30); color: #2a1c0c;
+    box-shadow: 0 12px 30px rgba(0,0,0,.45); display: flex; align-items: center; gap: 14px; }
+  .sb-crown { position: absolute; right: -14px; bottom: -18px; color: #2a1c0c; opacity: .12; pointer-events: none; }
+  .sb-hero-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .sb-hero-title { font-family: "Cinzel", serif; font-size: 21px; font-weight: 600; margin: 5px 0 7px; }
+  .sb-hero-desc { font-family: "Cormorant Garamond", serif; font-size: 15px; line-height: 1.4; margin: 0; color: #3d2a14; }
+  .sb-hero-pts { position: relative; z-index: 1; flex: 0 0 auto; background: #10201c; color: #f0dca2;
+    border-radius: 10px; padding: 10px 14px; text-align: center; font-family: "Cinzel", serif; font-size: 26px; font-weight: 700; line-height: 1;
+    box-shadow: 0 4px 10px rgba(0,0,0,.3); }
+  .sb-hero-pts span { display: block; font-size: 8px; letter-spacing: 2px; margin-top: 3px; opacity: .8; font-weight: 600; }
+  .sb-card { background: linear-gradient(180deg,rgba(22,38,31,.9),rgba(13,24,21,.9)); border-radius: 12px;
+    padding: 18px 18px 8px; border-top: 3px solid #caa24f; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+  .sb-card-title { font-family: "Cinzel", serif; font-size: 17px; font-weight: 600; color: #f4ecd6; margin: 4px 0 3px; }
+  .sb-card-sub { font-family: "Cormorant Garamond", serif; font-style: italic; font-size: 14px; color: rgba(244,236,214,.6); margin: 0 0 12px; }
+  .sb-list { list-style: none; margin: 0; padding: 0; }
+  .sb-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 11px 0; border-bottom: 1px solid rgba(202,162,79,.12); }
+  .sb-item:last-child { border-bottom: none; }
+  .sb-it-info { min-width: 0; }
+  .sb-it-title { font-family: "Cormorant Garamond", serif; font-size: 17px; font-weight: 600; color: #ece1c6; line-height: 1.2; }
+  .sb-it-desc { font-family: "Cormorant Garamond", serif; font-size: 13.5px; color: rgba(244,236,214,.5); line-height: 1.35; margin-top: 2px; }
+  .sb-pts { flex: 0 0 auto; font-family: "Cinzel", serif; font-size: 12px; font-weight: 600; color: #caa24f;
+    background: rgba(202,162,79,.12); border: 1px solid rgba(202,162,79,.25); border-radius: 7px; padding: 5px 9px; white-space: nowrap; }
+  .sb-chess { margin: 8px 0 12px; padding: 12px 14px; border: 1px dashed rgba(202,162,79,.35); border-radius: 8px; }
+  .sb-chess-h { display: block; font-family: "Cinzel", serif; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .sb-chess-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    font-family: "Cormorant Garamond", serif; font-size: 14.5px; color: #ece1c6; padding: 3px 0; }
+  .sb-chess-row em { font-style: italic; color: rgba(244,236,214,.5); font-size: 12.5px; }
+  .sb-chess-pts { color: #caa24f; font-family: "Cinzel", serif; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .sb-foot { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0 4px; }
+  .sb-foot-rule { width: 30px; height: 1px; background: #caa24f; opacity: .4; }
+  .sb-foot-text { font-family: "Cinzel", serif; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #caa24f; opacity: .7; }
+
+  /* ── finale (screen VI) ── */
+  .fin-stage { position: relative; z-index: 2; flex: 1 1 auto; width: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 0 30px; }
+  .fin-crown { color: #caa24f; opacity: .9; filter: drop-shadow(0 4px 16px rgba(202,162,79,.4)); margin-bottom: 22px; }
+  .fin-kicker { font-family: "Cinzel", serif; font-size: 11px; letter-spacing: 4px; text-transform: uppercase; opacity: .85; }
+  .fin-title { font-family: "Cinzel", serif; font-size: 30px; font-weight: 600; color: #f4ecd6; margin: 10px 0 18px; letter-spacing: .5px; }
+  .fin-pts { font-family: "Cinzel", serif; font-size: 66px; font-weight: 700; line-height: 1; text-shadow: 0 2px 30px rgba(202,162,79,.45); }
+  .fin-pts span { font-size: 18px; font-weight: 500; letter-spacing: 3px; margin-left: 8px; text-transform: uppercase; }
+  .fin-rule { width: 64px; height: 1px; margin: 26px auto; opacity: .6; }
+  .fin-congrats { font-family: "Cormorant Garamond", serif; font-style: italic; font-size: 22px; line-height: 1.4; color: #ece1c6; margin: 0; }
+  .fin-congrats strong { color: #caa24f; font-style: normal; font-weight: 600; }
+
+  /* ── Stigasöfnun pull-down (every screen) ── */
+  .points-tab { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 46;
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 16px 8px;
+    border-radius: 0 0 12px 12px; border: 1px solid rgba(202,162,79,.32); border-top: none;
+    background: rgba(10,18,15,.8); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    color: #caa24f; font-family: "Cinzel", serif; font-size: 9.5px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase;
+    cursor: pointer; transition: background .2s; }
+  .points-tab:hover { background: rgba(202,162,79,.16); }
+  .ps-modal { position: absolute; inset: 0; z-index: 55; display: flex; align-items: flex-start; justify-content: center;
+    background: rgba(5,12,10,.72); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+  .ps-modal.is-on { opacity: 1; pointer-events: auto; }
+  .ps-dialog { width: 100%; max-width: 440px; max-height: 100%; display: flex; flex-direction: column;
+    background: linear-gradient(180deg,#0e1c19,#091310);
+    border-bottom: 1px solid rgba(202,162,79,.3); box-shadow: 0 26px 60px rgba(0,0,0,.6);
+    transform: translateY(-100%); transition: transform .42s cubic-bezier(.2,.8,.3,1); }
+  .ps-modal.is-on .ps-dialog { transform: translateY(0); }
+  .ps-bar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px;
+    border-bottom: 1px solid rgba(202,162,79,.18); }
+  .ps-title { font-family: "Cinzel", serif; font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #caa24f; }
+  .ps-close { background: transparent; border: none; color: rgba(244,236,214,.6); font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px; transition: color .15s; }
+  .ps-close:hover { color: #f4ecd6; }
+  .ps-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 18px 26px; display: flex; flex-direction: column; gap: 16px; }
+  .ps-body > * { flex-shrink: 0; }
+  .sb-hero-mini { padding: 14px 16px; }
+  .sb-hero-mini .sb-hero-title { font-size: 18px; }
+  .sb-hero-mini .sb-hero-desc { font-size: 13.5px; }
+  .sb-hero-mini .sb-hero-pts { font-size: 22px; padding: 8px 12px; }
+
+  /* ── between-screen fade ── */
+  .game-fade {
+    position: absolute; inset: 0; z-index: 50; background: #05100d;
+    opacity: 0; pointer-events: none; transition: opacity .45s ease;
+  }
+  .game-fade.is-on { opacity: 1; pointer-events: auto; }
+
+  /* ── back / forward navigation ── */
+  .nav-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 45;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid rgba(202,162,79,.32); background: rgba(8,14,12,.42);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    color: #caa24f; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: .7; transition: background .2s, opacity .2s, border-color .2s;
+  }
+  .nav-arrow:hover { background: rgba(202,162,79,.14); opacity: 1; border-color: rgba(202,162,79,.6); }
+  .nav-back { left: 12px; }
+  .nav-fwd { right: 12px; }
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#0e1c19"/>
+    <circle cx="50" cy="50" r="30" fill="none" stroke="#caa24f" stroke-width="2.5"/>
+    <circle cx="50" cy="50" r="2.6" fill="#caa24f"/>
+    <line x1="50" y1="50" x2="50" y2="30" stroke="#caa24f" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="50" y1="50" x2="64" y2="58" stroke="#caa24f" stroke-width="2.4" stroke-linecap="round"/>
+  </svg>
+</template>
+<div class="stage" id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="stereo-img.js"></script>
+<script type="text/babel" src="clock.jsx"></script>
+<script type="text/babel" src="lock.jsx"></script>
+<script type="text/babel" src="tiles.jsx"></script>
+<script type="text/babel" src="video.jsx"></script>
+<script type="text/babel" src="stereo.jsx"></script>
+<script type="text/babel" src="scoreboard.jsx"></script>
+<script type="text/babel">
+  function ComingSoon({ chapter }) {
+    const t = (window.THEMES && window.THEMES.nouveau) || {};
+    return (
+      <div className="cs-screen" style={{ background: 'radial-gradient(120% 90% at 50% 16%, #173029 0%, #0e1c19 55%, #060d0b 100%)' }}>
+        <div className="cs-grain" />
+        <div className="cs-vig" />
+        <div className="cs-head">
+          <span className="cs-rule" />
+          <span className="cs-chapter" style={{ color: t.label }}>{chapter}</span>
+          <span className="cs-rule" />
+        </div>
+        <div className="cs-soon">Næsta þraut í smíðum</div>
+        <div className="cs-contact">salmons-volumes.8r@icloud.com</div>
+      </div>
+    );
+  }
+
+  function Game() {
+    const init = (() => {
+      const h = parseInt((location.hash || '').slice(1), 10);
+      return Number.isInteger(h) && h >= 0 && h <= 5 ? h : 0;
+    })();
+    const [screen, setScreen] = React.useState(init);
+    const [maxReached, setMaxReached] = React.useState(init);
+    const [fade, setFade] = React.useState(false);
+    const [pointsOpen, setPointsOpen] = React.useState(false);
+
+    const nav = (n) => {
+      if (n === screen || n < 0 || n > maxReached) return;
+      setFade(true);
+      setTimeout(() => { setScreen(n); requestAnimationFrame(() => setFade(false)); }, 320);
+    };
+    const advance = (n) => {
+      setMaxReached((m) => Math.max(m, n));
+      setFade(true);
+      setTimeout(() => { setScreen(n); requestAnimationFrame(() => setFade(false)); }, 470);
+    };
+
+    React.useEffect(() => { try { history.replaceState(null, '', '#' + screen); } catch (e) {} }, [screen]);
+
+    const screens = [
+      <ClockScreen variant="nouveau" onAdvance={() => advance(1)} />,
+      <LockScreen onAdvance={() => advance(2)} />,
+      <AnagramScreen onAdvance={() => advance(3)} />,
+      <VideoScreen onAdvance={() => advance(4)} active={screen === 3} />,
+      <StereoScreen onAdvance={() => advance(5)} />,
+      <ScoreboardScreen />,
+    ];
+
+    const Chevron = ({ dir }) => (
+      <svg viewBox="0 0 12 18" width="12" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d={dir === 'back' ? 'M9 2L3 9l6 7' : 'M3 2l6 7-6 7'} />
+      </svg>
+    );
+
+    return (
+      <React.Fragment>
+        {screens.map((s, i) => (i <= maxReached
+          ? <div key={i} style={{ position: 'absolute', inset: 0, display: i === screen ? 'block' : 'none' }}>{s}</div>
+          : null))}
+
+        {screen > 0 && (
+          <button className="nav-arrow nav-back" onClick={() => nav(screen - 1)} aria-label="til baka"><Chevron dir="back" /></button>
+        )}
+        {screen < maxReached && (
+          <button className="nav-arrow nav-fwd" onClick={() => nav(screen + 1)} aria-label="áfram"><Chevron dir="fwd" /></button>
+        )}
+
+        {/* Stigasöfnun — available on every screen */}
+        <button className="points-tab" onClick={() => setPointsOpen(true)}>
+          Stigasöfnun
+          <svg viewBox="0 0 12 8" width="11" height="8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M1 1l5 5 5-5" /></svg>
+        </button>
+        <div className={'ps-modal' + (pointsOpen ? ' is-on' : '')} onClick={() => setPointsOpen(false)}>
+          <div className="ps-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="ps-bar">
+              <span className="ps-title">Stigasöfnun</span>
+              <button className="ps-close" onClick={() => setPointsOpen(false)} aria-label="loka">×</button>
+            </div>
+            <div className="ps-body"><PointsSheet /></div>
+          </div>
+        </div>
+
+        <div className={'game-fade' + (fade ? ' is-on' : '')} />
+      </React.Fragment>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<Game />);
+</script>
+</body>
+</html>
